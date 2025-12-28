@@ -1,0 +1,51 @@
+name: Deploy to VPS
+
+on:
+  # قابلیت اجرای دستی با دکمه Run Workflow
+  workflow_dispatch:
+  # اجرا با هر بار پوش کردن تغییرات در اینفرا (مثلاً تغییر کانفیگ nginx)
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # تنظیم کلید SSH برای اتصال به سرور
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          # اضافه کردن کلید به Agent
+          eval $(ssh-agent -s)
+          ssh-add ~/.ssh/id_rsa
+          # غیرفعال کردن چک کردن اثر انگشت سرور (برای جلوگیری از توقف تعاملی)
+          echo "StrictHostKeyChecking no" >> ~/.ssh/config
+
+      # نصب انسیبل روی ماشین مجازی گیت‌هاب (Runner)
+      - name: Install Ansible
+        run: |
+          sudo apt update
+          sudo apt install -y ansible
+
+      # اجرای پلی‌بوک
+      - name: Run Ansible Playbook
+        env:
+          # تزریق سکرت‌ها به متغیرهای محیطی برای انسیبل
+          ANSIBLE_HOST_KEY_CHECKING: "False"
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        run: |
+          # ساخت فایل اینونتوری موقت
+          echo "[webservers]" > inventory.ini
+          echo "rozhan_vps ansible_host=${{ secrets.VPS_IP }} ansible_user=${{ secrets.VPS_USER }} ansible_port=22" >> inventory.ini
+          
+          # دستور آتش!
+          ansible-playbook -i inventory.ini ansible/playbooks/deploy.yml
