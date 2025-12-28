@@ -1,0 +1,58 @@
+---
+- name: Automated Production Deploy
+  hosts: webservers
+  become: true
+  
+  # دیگر سوالی نمی‌پرسیم، متغیرها باید ست شده باشند
+  vars:
+    project_root: /opt/rozhan-clinic
+
+  tasks:
+    # 1. لاگین به داکر هاب (با استفاده از متغیرهای محیطی)
+    - name: Log into Docker Hub on VPS
+      docker_login:
+        username: "{{ lookup('env', 'DOCKER_USERNAME') }}"
+        password: "{{ lookup('env', 'DOCKER_PASSWORD') }}"
+
+    # 2. ساخت پوشه‌های پروژه
+    - name: Create project directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+      loop:
+        - "{{ project_root }}"
+        - "{{ project_root }}/nginx"
+
+    # 3. کپی فایل‌های داکر کامپوز و کانفیگ
+    - name: Copy docker-compose.yml
+      copy:
+        src: ../../docker/docker-compose.yml
+        dest: "{{ project_root }}/docker-compose.yml"
+        mode: '0644'
+
+    - name: Copy Nginx config
+      copy:
+        src: ../../docker/nginx/default.conf
+        dest: "{{ project_root }}/nginx/default.conf"
+        mode: '0644'
+
+    # 4. ساخت فایل .env به صورت امن
+    # مقادیر را از GitHub Secrets می‌گیرد و در فایل روی سرور می‌نویسد
+    - name: Create .env file
+      copy:
+        dest: "{{ project_root }}/.env"
+        content: |
+          DB_PASS={{ lookup('env', 'DB_PASSWORD') }}
+          SECRET_KEY={{ lookup('env', 'SECRET_KEY') }}
+        mode: '0600'
+
+    # 5. اجرای کامپوز
+    - name: Pull and Restart Containers
+      community.docker.docker_compose_v2:
+        project_src: "{{ project_root }}"
+        pull: always
+        state: present
+        recreate: always

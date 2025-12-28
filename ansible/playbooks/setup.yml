@@ -1,0 +1,105 @@
+---
+- name: Server Setup & Hardening
+  hosts: all
+  become: true
+  vars:
+    sys_user: rozhan-admin
+    local_ssh_pub_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+
+  tasks:
+    # ---------------------------------------
+    # 1. System Update
+    # ---------------------------------------
+    - name: Update and upgrade apt packages
+      apt:
+        upgrade: yes
+        update_cache: yes
+        cache_valid_time: 86400
+
+    # ---------------------------------------
+    # 2. Install Docker (MOVED UP)
+    # ---------------------------------------
+    - name: Install required system packages for Docker
+      apt:
+        pkg:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - python3-pip
+          - virtualenv
+          - python3-setuptools
+        state: latest
+        update_cache: true
+
+    - name: Add Docker GPG apt Key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker Repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu focal stable
+        state: present
+
+    - name: Install Docker CE
+      apt:
+        name: docker-ce
+        state: latest
+        update_cache: true
+
+    - name: Install Docker Compose Plugin
+      apt:
+        name: docker-compose-plugin
+        state: latest
+
+    # ---------------------------------------
+    # 3. User Creation & Security
+    # ---------------------------------------
+    - name: Create a new regular user
+      user:
+        name: "{{ sys_user }}"
+        shell: /bin/bash
+        groups: sudo, docker
+        append: yes
+        state: present
+        create_home: yes
+
+    - name: Add SSH key for the new user
+      authorized_key:
+        user: "{{ sys_user }}"
+        state: present
+        key: "{{ local_ssh_pub_key }}"
+
+    - name: Allow 'sudo' group to have passwordless sudo
+      lineinfile:
+        dest: /etc/sudoers
+        state: present
+        regexp: '^%sudo'
+        line: '%sudo ALL=(ALL) NOPASSWD: ALL'
+        validate: 'visudo -cf %s'
+
+    # ---------------------------------------
+    # 4. SSH Hardening
+    # ---------------------------------------
+    - name: Disable password authentication for root
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^PermitRootLogin'
+        line: 'PermitRootLogin no'
+        state: present
+      notify: Restart SSH
+
+    - name: Disable Password Authentication (Force Key Only)
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^PasswordAuthentication'
+        line: 'PasswordAuthentication no'
+        state: present
+      notify: Restart SSH
+
+  handlers:
+    - name: Restart SSH
+      service:
+        name: ssh
+        state: restarted
