@@ -6,8 +6,10 @@ services:
     restart: always
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - backend
       - frontend
@@ -35,11 +37,9 @@ services:
 
   # --- Backend ---
   backend:
-    # اشاره به ایمیج آپلود شده شما (با تگ v1)
     image: alihajizadeh/rozhan-bakcend:v1
     container_name: rozhan_backend
     restart: always
-    # دستور اجرای سیدینگ و سپس ران شدن برنامه
     command: sh -c "python seed.py && uvicorn main:app --host 0.0.0.0 --port 8000"
     environment:
       - DATABASE_URL=postgresql://postgres:${DB_PASS}@db:5432/rozhan_db
@@ -52,7 +52,6 @@ services:
 
   # --- Frontend ---
   frontend:
-    # اشاره به ایمیج آپلود شده شما (با تگ v1)
     image: alihajizadeh/rozhan-frontend:v1
     container_name: rozhan_frontend
     restart: always
