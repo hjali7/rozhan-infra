@@ -37,7 +37,7 @@ services:
 
   # --- Backend ---
   backend:
-    image: alihajizadeh/rozhan-bakcend:v1
+    image: alihajizadeh/rozhan-backend:v2
     container_name: rozhan_backend
     restart: always
     command: sh -c "python seed.py && uvicorn main:app --host 0.0.0.0 --port 8000"

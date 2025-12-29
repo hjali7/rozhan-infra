@@ -1,9 +1,7 @@
 name: Deploy to VPS
 
 on:
-  # قابلیت اجرای دستی با دکمه Run Workflow
   workflow_dispatch:
-  # اجرا با هر بار پوش کردن تغییرات در اینفرا (مثلاً تغییر کانفیگ nginx)
   push:
     branches:
       - main
@@ -15,7 +13,6 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # تنظیم کلید SSH برای اتصال به سرور
       - name: Setup SSH Key
         run: |
           mkdir -p ~/.ssh
@@ -27,16 +24,13 @@ jobs:
           # غیرفعال کردن چک کردن اثر انگشت سرور (برای جلوگیری از توقف تعاملی)
           echo "StrictHostKeyChecking no" >> ~/.ssh/config
 
-      # نصب انسیبل روی ماشین مجازی گیت‌هاب (Runner)
       - name: Install Ansible
         run: |
           sudo apt update
           sudo apt install -y ansible
 
-      # اجرای پلی‌بوک
       - name: Run Ansible Playbook
         env:
-          # تزریق سکرت‌ها به متغیرهای محیطی برای انسیبل
           ANSIBLE_HOST_KEY_CHECKING: "False"
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
